@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply scroll-smooth;
+  }
+  body {
+    @apply bg-canvas text-ink font-body antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display text-ink;
+  }
+  /* Strong, visible focus ring everywhere — accessibility requirement */
+  :focus-visible {
+    outline: 2px solid #0F766E;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background-color: #D6F3EE;
+    color: #073C38;
+  }
+}
+
+@layer utilities {
+  /* Signature ambient background blobs — subtle, slow, never distracting */
+  .blob {
+    @apply absolute rounded-full blur-3xl pointer-events-none;
+    opacity: 0.35;
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .skeleton {
+    background: linear-gradient(90deg, #EEF0EE 25%, #F8F9F8 37%, #EEF0EE 63%);
+    background-size: 400% 100%;
+    @apply animate-shimmer rounded-md;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

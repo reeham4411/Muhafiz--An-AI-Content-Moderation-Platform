@@ -35,8 +35,11 @@ export const adminListSubmissions = asyncHandler(async (req: Request, res: Respo
     submissions = submissions
       .map((s: any) => {
         const filteredImages = (s.images || []).filter((img: any) =>
-          img.categoryBreakdown?.some((c: any) => c.category === category)
+          img.categoryBreakdown?.some(
+            (c: any) => c.category === category && c.contributedToVerdict === true
+          )
         );
+
         return { ...(s.toObject ? s.toObject() : s), images: filteredImages };
       })
       .filter((s: any) => s.images.length > 0) as any;

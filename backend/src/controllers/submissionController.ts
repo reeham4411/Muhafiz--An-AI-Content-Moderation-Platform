@@ -72,7 +72,9 @@ export const getMySubmissions = asyncHandler(async (req: Request, res: Response)
     submissions = submissions
       .map((s: any) => {
         const filteredImages = s.images.filter((img: any) =>
-          img.categoryBreakdown.some((c: any) => c.category === category)
+          img.categoryBreakdown.some(
+            (c: any) => c.category === category && c.contributedToVerdict === true
+          )
         );
         return { ...(s.toObject ? s.toObject() : s), images: filteredImages };
       })
