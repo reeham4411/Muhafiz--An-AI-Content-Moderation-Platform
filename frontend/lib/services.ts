@@ -67,7 +67,14 @@ export async function createSubmission(files: File[]) {
   );
   return res.data.data.submission;
 }
-
+export async function deleteSubmission(id: string) {
+  const res = await apiClient.delete(`/api/submissions/${id}`);
+  return res.data;
+}
+export async function deleteSubmissionImage(submissionId: string, imageId: string) {
+  const res = await apiClient.delete(`/api/submissions/${submissionId}/images/${imageId}`);
+  return res.data;
+}
 export interface SubmissionFilters {
   outcome?: Verdict;
   category?: ModerationCategory;

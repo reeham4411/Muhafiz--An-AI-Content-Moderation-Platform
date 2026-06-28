@@ -108,3 +108,93 @@ export const getSubmissionById = asyncHandler(async (req: Request, res: Response
 
   res.json({ success: true, data: { submission } });
 });
+export const deleteSubmission = asyncHandler(async (req: Request, res: Response) => {
+  const submission = await Submission.findById(req.params.id);
+
+  if (!submission) {
+    throw new NotFoundError("Submission not found");
+  }
+
+  const isOwner = submission.user.toString() === req.user!.userId;
+  const isAdmin = req.user!.role === UserRole.ADMIN;
+
+  if (!isOwner && !isAdmin) {
+    throw new ForbiddenError("You do not have permission to delete this submission");
+  }
+
+  // Delete uploaded image files from local uploads folder
+  for (const image of submission.images) {
+    if (image.filePath) {
+      try {
+        await fs.unlink(image.filePath);
+      } catch (error: any) {
+        // Ignore missing file errors so DB deletion still succeeds
+        if (error.code !== "ENOENT") {
+          console.warn(`Failed to delete file: ${image.filePath}`, error.message);
+        }
+      }
+    }
+  }
+
+  await Submission.findByIdAndDelete(req.params.id);
+
+  res.json({
+    success: true,
+    message: "Submission deleted successfully",
+  });
+});
+export const deleteSubmissionImage = asyncHandler(async (req: Request, res: Response) => {
+  const { id, imageId } = req.params;
+
+  const submission = await Submission.findById(id);
+
+  if (!submission) {
+    throw new NotFoundError("Submission not found");
+  }
+
+  const isOwner = submission.user.toString() === req.user!.userId;
+  const isAdmin = req.user!.role === UserRole.ADMIN;
+
+  if (!isOwner && !isAdmin) {
+    throw new ForbiddenError("You do not have permission to delete this image");
+  }
+
+  const image = submission.images.id(imageId);
+
+  if (!image) {
+    throw new NotFoundError("Image not found in submission");
+  }
+
+  if (image.filePath) {
+    try {
+      await fs.unlink(image.filePath);
+    } catch (error: any) {
+      if (error.code !== "ENOENT") {
+        console.warn(`Failed to delete file: ${image.filePath}`, error.message);
+      }
+    }
+  }
+
+  submission.images.pull(imageId);
+
+  if (submission.images.length === 0) {
+    await Submission.findByIdAndDelete(id);
+
+    return res.json({
+      success: true,
+      message: "Image deleted successfully. Submission was removed because it had no images left.",
+      data: { submissionDeleted: true },
+    });
+  }
+
+  await submission.save();
+
+  res.json({
+    success: true,
+    message: "Image deleted successfully",
+    data: {
+      submissionDeleted: false,
+      submission,
+    },
+  });
+});

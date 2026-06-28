@@ -2,17 +2,22 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, Trash2 } from "lucide-react";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { LoadingState } from "@/components/ui/LoadingState";
-import { ErrorState } from "@/components/ui/ErrorState";
-import { Alert } from "@/components/ui/ErrorState";
+import { ErrorState, Alert } from "@/components/ui/ErrorState";
 import { ImageResultCard } from "@/components/submissions/ImageResultCard";
 import { FileAppealModal } from "@/components/upload/FileAppealModal";
-import { getSubmissionById, createAppeal } from "@/lib/services";
+import { DeleteConfirmModal } from "@/components/ui/DeleteConfirmModal";
+import {
+  getSubmissionById,
+  createAppeal,
+  deleteSubmission,
+  deleteSubmissionImage,
+} from "@/lib/services";
 import { getErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { downloadSubmissionReport } from "@/lib/report";
@@ -38,6 +43,14 @@ function SubmissionDetailContent() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const [deleting, setDeleting] = useState(false);
+  const [deleteSubmissionModalOpen, setDeleteSubmissionModalOpen] =
+    useState(false);
+
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
+  const [imageDeleteTarget, setImageDeleteTarget] =
+    useState<ModeratedImage | null>(null);
+
   const [appealTarget, setAppealTarget] = useState<ModeratedImage | null>(null);
   const [appealModalOpen, setAppealModalOpen] = useState(false);
   const [appealedIds, setAppealedIds] = useState<Set<string>>(new Set());
@@ -45,6 +58,7 @@ function SubmissionDetailContent() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
       const sub = await getSubmissionById(id);
       setSubmission(sub);
@@ -59,6 +73,64 @@ function SubmissionDetailContent() {
     load();
   }, [load]);
 
+  const handleDeleteSubmission = async () => {
+    if (!submission) return;
+
+    setDeleting(true);
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      await deleteSubmission(submission._id);
+      setDeleteSubmissionModalOpen(false);
+      router.push("/submissions");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteImage = async () => {
+    if (!submission || !imageDeleteTarget) return;
+
+    setDeletingImageId(imageDeleteTarget._id);
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await deleteSubmissionImage(
+        submission._id,
+        imageDeleteTarget._id,
+      );
+
+      if (res.data?.submissionDeleted) {
+        setImageDeleteTarget(null);
+        router.push("/submissions");
+        return;
+      }
+
+      setSubmission((prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          images: prev.images.filter(
+            (img) => img._id !== imageDeleteTarget._id,
+          ),
+        };
+      });
+
+      setSuccessMsg("Image deleted successfully.");
+      setTimeout(() => setSuccessMsg(null), 4000);
+      setImageDeleteTarget(null);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDeletingImageId(null);
+    }
+  };
+
   const handleAppealRequest = (image: ModeratedImage) => {
     setAppealTarget(image);
     setAppealModalOpen(true);
@@ -66,9 +138,13 @@ function SubmissionDetailContent() {
 
   const handleAppealSubmit = async (justification: string) => {
     if (!submission || !appealTarget) return;
+
     await createAppeal(submission._id, appealTarget._id, justification);
+
     setAppealedIds((prev) => new Set(prev).add(appealTarget._id));
-    setSuccessMsg("Appeal submitted successfully. You can track its status on the My Appeals page.");
+    setSuccessMsg(
+      "Appeal submitted successfully. You can track its status on the My Appeals page.",
+    );
     setTimeout(() => setSuccessMsg(null), 5000);
   };
 
@@ -88,14 +164,28 @@ function SubmissionDetailContent() {
 
       <PageHeader
         title="Submission details"
-        description={`Submitted ${formatDate(submission.createdAt)} · ${submission.images.length} ${
-          submission.images.length === 1 ? "image" : "images"
-        }`}
+        description={`Submitted ${formatDate(submission.createdAt)} · ${
+          submission.images.length
+        } ${submission.images.length === 1 ? "image" : "images"}`}
         actions={
-          <Button variant="secondary" onClick={() => downloadSubmissionReport(submission)}>
-            <Download className="h-4 w-4" />
-            Download report
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => downloadSubmissionReport(submission)}
+            >
+              <Download className="h-4 w-4" />
+              Download report
+            </Button>
+
+            <Button
+              variant="outlineDanger"
+              onClick={() => setDeleteSubmissionModalOpen(true)}
+              disabled={deleting}
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleting ? "Deleting..." : "Delete submission"}
+            </Button>
+          </div>
         }
       />
 
@@ -112,10 +202,48 @@ function SubmissionDetailContent() {
             image={image}
             onAppeal={() => handleAppealRequest(image)}
             appealDisabled={appealedIds.has(image._id)}
-            appealLabel={appealedIds.has(image._id) ? "Appeal submitted" : "File appeal"}
+            appealLabel={
+              appealedIds.has(image._id) ? "Appeal submitted" : "File appeal"
+            }
+            onDelete={() => setImageDeleteTarget(image)}
+            deleting={deletingImageId === image._id}
           />
         ))}
       </div>
+
+      <DeleteConfirmModal
+        open={!!imageDeleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setImageDeleteTarget(null);
+        }}
+        title={
+          submission.images.length === 1
+            ? "Delete last image?"
+            : "Delete this image?"
+        }
+        description={
+          submission.images.length === 1
+            ? "This is the last image in this submission. Deleting it will remove the entire submission."
+            : `This will permanently delete "${imageDeleteTarget?.fileName}" from this submission. Other images will be kept.`
+        }
+        confirmLabel={
+          submission.images.length === 1 ? "Delete submission" : "Delete image"
+        }
+        loading={!!deletingImageId}
+        onConfirm={handleDeleteImage}
+      />
+
+      <DeleteConfirmModal
+        open={deleteSubmissionModalOpen}
+        onOpenChange={setDeleteSubmissionModalOpen}
+        title="Delete entire submission?"
+        description={`This will permanently delete this submission and all ${
+          submission.images.length
+        } ${submission.images.length === 1 ? "image" : "images"} inside it.`}
+        confirmLabel="Delete submission"
+        loading={deleting}
+        onConfirm={handleDeleteSubmission}
+      />
 
       <FileAppealModal
         open={appealModalOpen}

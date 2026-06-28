@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ImageOff, Calendar, Cpu, RotateCcw, ChevronDown } from "lucide-react";
+import {
+  ImageOff,
+  Calendar,
+  Cpu,
+  RotateCcw,
+  ChevronDown,
+  Trash2,
+} from "lucide-react";
 import { ModeratedImage } from "@/types";
 import { VerdictBadge } from "@/components/ui/VerdictBadge";
 import { Button } from "@/components/ui/Button";
@@ -15,14 +22,19 @@ export function ImageResultCard({
   onAppeal,
   appealDisabled,
   appealLabel = "File appeal",
+  onDelete,
+  deleting = false,
 }: {
   image: ModeratedImage;
   onAppeal?: () => void;
   appealDisabled?: boolean;
   appealLabel?: string;
+  onDelete?: () => void;
+  deleting?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [imgError, setImgError] = useState(false);
+
   const canAppeal = image.verdict === "FLAGGED" || image.verdict === "BLOCKED";
 
   return (
@@ -49,8 +61,11 @@ export function ImageResultCard({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate font-medium text-ink">{image.fileName}</p>
-              <p className="text-xs text-ink-faint mt-0.5">{formatFileSize(image.sizeBytes)}</p>
+              <p className="text-xs text-ink-faint mt-0.5">
+                {formatFileSize(image.sizeBytes)}
+              </p>
             </div>
+
             <VerdictBadge verdict={image.verdict} />
           </div>
 
@@ -59,10 +74,12 @@ export function ImageResultCard({
               <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
               {formatDate(image.createdAt)}
             </span>
+
             <span className="flex items-center gap-1.5">
               <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
               {image.provider}
             </span>
+
             {image.overridden && (
               <span className="flex items-center gap-1.5 font-medium text-amber-700">
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -79,17 +96,40 @@ export function ImageResultCard({
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
+              type="button"
               onClick={() => setExpanded(!expanded)}
               aria-expanded={expanded}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 rounded-lg px-1 -mx-1"
             >
               {expanded ? "Hide" : "View"} category breakdown
-              <ChevronDown className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")} />
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  expanded && "rotate-180",
+                )}
+              />
             </button>
 
             {onAppeal && canAppeal && (
-              <Button size="sm" variant="secondary" onClick={onAppeal} disabled={appealDisabled}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={onAppeal}
+                disabled={appealDisabled}
+              >
                 {appealLabel}
+              </Button>
+            )}
+
+            {onDelete && (
+              <Button
+                size="sm"
+                variant="outlineDanger"
+                onClick={onDelete}
+                disabled={deleting}
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleting ? "Deleting..." : "Delete image"}
               </Button>
             )}
           </div>
