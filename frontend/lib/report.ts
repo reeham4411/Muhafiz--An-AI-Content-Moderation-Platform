@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Submission, ModeratedImage, CATEGORY_LABELS } from "@/types";
+import { Submission, ModeratedImage, getCategoryLabel } from "@/types";
 import { formatDate, formatConfidence, formatFileSize } from "./format";
 
 function getVerdictColor(verdict: string): [number, number, number] {
@@ -167,15 +167,21 @@ export function downloadSubmissionReport(submission: Submission): void {
           "Reasoning",
         ],
       ],
-      body: image.categoryBreakdown.map((c) => [
-        CATEGORY_LABELS[c.category] || c.category,
-        c.violationDetected ? "Detected" : "Not detected",
-        formatConfidence(c.confidenceScore),
-        formatConfidence(c.thresholdUsed),
-        c.enforcementUsed,
-        c.contributedToVerdict ? "Yes" : "No",
-        c.reasoning || "No reasoning provided",
-      ]),
+      body: image.categoryBreakdown.map((c) => {
+        const matchedPolicy = image.policySnapshot?.find(
+          (policy) => policy.category === c.category
+        );
+
+        return [
+          getCategoryLabel(c.category, matchedPolicy?.displayName),
+          c.violationDetected ? "Detected" : "Not detected",
+          formatConfidence(c.confidenceScore),
+          formatConfidence(c.thresholdUsed),
+          c.enforcementUsed,
+          c.contributedToVerdict ? "Yes" : "No",
+          c.reasoning || "No reasoning provided",
+        ];
+      }),
       styles: {
         font: "helvetica",
         fontSize: 7.8,
@@ -220,7 +226,7 @@ export function downloadSubmissionReport(submission: Submission): void {
       startY: finalY,
       head: [["Category", "Enabled", "Threshold", "Enforcement"]],
       body: policySnapshot.map((policy) => [
-        CATEGORY_LABELS[policy.category] || policy.category,
+        getCategoryLabel(policy.category, policy.displayName),
         policy.enabled ? "Yes" : "No",
         formatConfidence(policy.confidenceThreshold),
         policy.enforcementBehavior,
